@@ -1,0 +1,142 @@
+[
+  {
+    "term": "マゾ",
+    "reading": "mazo",
+    "wrongs": ["魔像", "魔女", "魔装"],
+    "trans": "受虐狂/M",
+    "type": "noun"
+  },
+  {
+    "term": "射精",
+    "reading": "shasei",
+    "wrongs": ["写真"],
+    "trans": "射精",
+    "type": "verb"
+  },
+  {
+    "term": "勃起",
+    "reading": "bokki",
+    "wrongs": ["簿記", "没機"],
+    "trans": "勃起",
+    "type": "verb"
+  },
+  {
+    "term": "勃起過程",
+    "reading": "bokkikatei",
+    "wrongs": [],
+    "trans": "勃起过程",
+    "type": "verb"
+  },
+  {
+    "term": "淫蕩",
+    "reading": "intou",
+    "wrongs": ["陰党", "引湯"],
+    "trans": "淫荡",
+    "type": "adj"
+  },
+  {
+    "term": "オタマジャクシ",
+    "reading": "otamajakushi",
+    "wrongs": ["玉着紙", "お玉", "お魂"],
+    "trans": "小蝌蚪",
+    "type": "noun"
+  },
+  {
+    "term": "寸止め",
+    "reading": "sundome",
+    "wrongs": ["澄んだ目"],
+    "trans": "寸止",
+    "type": "verb"
+  },
+  {
+    "term": "我慢汁",
+    "reading": "gamanjiru",
+    "wrongs": [],
+    "trans": "忍耐液",
+    "type": "noun"
+  },
+  {
+    "term": "オナサポ",
+    "reading": "onasapo",
+    "wrongs": ["オーナーサポート"],
+    "trans": "自慰辅助",
+    "type": "noun"
+  },
+  {
+    "term": "イラマチオ",
+    "reading": "iramachio",
+    "wrongs": ["イラ町"],
+    "trans": "深喉/口交",
+    "type": "noun"
+  },
+  {
+    "term": "雑魚",
+    "reading": "zako",
+    "wrongs": ["THE", "雑務"],
+    "trans": "杂鱼",
+    "type": "noun"
+  },
+  {
+    "term": "クリトリス",
+    "reading": "kuritorisu",
+    "wrongs": ["栗"],
+    "trans": "阴蒂",
+    "type": "noun"
+  },
+  {
+    "term": "金玉",
+    "reading": "kintama",
+    "wrongs": [],
+    "trans": "睾丸/蛋蛋",
+    "type": "noun"
+  },
+  {
+    "term": "クリクリ",
+    "reading": "kurikuri",
+    "wrongs": ["くっしょり"],
+    "trans": "(搓弄声)",
+    "type": "noise"
+  },
+  {
+    "term": "カリ",
+    "reading": "kari",
+    "wrongs": ["ガリ", "かりっ", "がりっ", "カリカリ", "ガリガリ", "ガリッ"],
+    "trans": "(刮擦声)",
+    "type": "noise"
+  },
+  {
+    "term": "シコ",
+    "reading": "shiko",
+    "wrongs": ["施工", "思考"],
+    "trans": "(撸管声)",
+    "type": "noise"
+  },
+  {
+    "term": "クチュ",
+    "reading": "kuchu",
+    "wrongs": [],
+    "trans": "(水声)",
+    "type": "noise"
+  },
+  {
+    "term": "ビク",
+    "reading": "biku",
+    "wrongs": [],
+    "trans": "(抽搐声)",
+    "type": "noise"
+  },
+  {
+    "term": "ドプ",
+    "reading": "dopu",
+    "wrongs": [],
+    "trans": "(射精声)",
+    "type": "noise"
+  },
+  {
+    "term": "コツ",
+    "reading": "kotsu",
+    "wrongs": [],
+    "trans": "(敲击声)",
+    "type": "noise"
+  }
+]
