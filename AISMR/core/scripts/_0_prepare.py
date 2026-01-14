@@ -19,6 +19,9 @@ def check_ffmpeg():
         sys.exit(1)
 
 def run_ffmpeg_normalization(input_path, output_path):
+    print("STATUS: Audio Normalization")
+    sys.stdout.flush()
+    
     compand_filter = "compand=attacks=0.05:decays=0.5:points=-90/-90|-60/-25|-20/-5|0/-0:gain=0"
     af_filter = f"highpass=f=80,lowpass=f=8000,{compand_filter},loudnorm=I=-14:TP=-1.0:LRA=11"
     cmd = [
@@ -38,6 +41,9 @@ def read_text_file_robust(file_path):
     return ""
 
 def analyze_context(cache_dir):
+    print("STATUS: Context Analysis")
+    sys.stdout.flush()
+
     context_file = os.path.join(cache_dir, "context.json")
     if os.path.exists(context_file) and os.path.getsize(context_file) > 0:
         return

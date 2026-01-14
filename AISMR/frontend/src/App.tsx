@@ -231,7 +231,11 @@ function App() {
       setLogs((prev) => [...prev, msg]);
       const idx = currentIndexRef.current;
       if (idx === null) return;
-      if (msg.includes("RUNNING: _0_prepare.py")) updateStatus(idx, 'preparing');
+      
+      // Update status based on script output
+      if (msg.includes("STATUS: Audio Normalization")) updateStatus(idx, 'normalizing');
+      else if (msg.includes("STATUS: Context Analysis")) updateStatus(idx, 'analyzing');
+      else if (msg.includes("RUNNING: _0_prepare.py")) updateStatus(idx, 'preparing');
       else if (msg.includes("RUNNING: _1_whisper.py")) updateStatus(idx, 'whispering');
       else if (msg.includes("RUNNING: _2_correct.py")) updateStatus(idx, 'correcting');
       else if (msg.includes("RUNNING: _3_translate.py")) updateStatus(idx, 'translating');
