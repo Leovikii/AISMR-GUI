@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { SelectFile, SelectFolder, RunScript, ProcessPaths, GetCacheInfo, ClearCache, GetSettings, SetSettings, CheckModels } from "../wailsjs/go/main/App";
+import { SelectFile, SelectFolder, RunScript, ProcessPaths, GetCacheInfo, ClearCache, GetSettings, SetSettings, ScanModels, DownloadModels } from "../wailsjs/go/main/App";
 import { WindowMinimise, Quit, EventsOn, EventsOff, OnFileDrop } from "../wailsjs/runtime/runtime";
-import { THEME, ICONS, Button, CustomSelect, ProgressBar, StatusBadge, ProcessStatus, DownloadModal } from "./components/Shared";
+import { THEME, ICONS, Button, CustomSelect, ProgressBar, StatusBadge, ProcessStatus, ModelInitModal } from "./components/Shared";
 
 interface FileItem {
   id: string;
@@ -191,7 +191,8 @@ function App() {
   const [cacheSize, setCacheSize] = useState<number>(0);
   const [cacheStrategy, setCacheStrategy] = useState<string>("off");
   
-  const [isDownloading, setIsDownloading] = useState(false);
+  const [initStep, setInitStep] = useState<'idle' | 'check' | 'prompt' | 'downloading'>('idle');
+  const [missingModels, setMissingModels] = useState<string[]>([]);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [downloadStatus, setDownloadStatus] = useState("");
 
@@ -239,17 +240,14 @@ function App() {
     
     // Model Download Events
     const dlProgress = (msg: string) => {
-        setIsDownloading(true);
         const p = parseInt(msg.replace("PROGRESS: ", ""));
         if (!isNaN(p)) setDownloadProgress(p);
     };
     const dlStatus = (msg: string) => {
-        setIsDownloading(true);
         setDownloadStatus(msg.replace("STATUS: ", ""));
     };
     const dlDone = () => {
-        setIsDownloading(false);
-        setDownloadStatus("Ready");
+        setInitStep('idle');
     };
 
     EventsOn("log-message", logHandler);
@@ -270,12 +268,28 @@ function App() {
   useEffect(() => {
     refreshCacheInfo();
     GetSettings().then(cfg => { if(cfg && cfg.cacheStrategy) setCacheStrategy(cfg.cacheStrategy); });
-    
-    // Check models on startup
-    CheckModels().catch(err => {
-        addLog(`[System] Model check failed: ${err}`);
-    });
+    performModelCheck();
   }, []);
+
+  const performModelCheck = async () => {
+    setInitStep('check');
+    const missing = await ScanModels();
+    if (missing && missing.length > 0) {
+        setMissingModels(missing);
+        setInitStep('prompt');
+    } else {
+        setInitStep('idle');
+    }
+  };
+
+  const handleStartDownload = async () => {
+    setInitStep('downloading');
+    await DownloadModels();
+  };
+
+  const handleManualCheck = async () => {
+    performModelCheck();
+  };
 
   const refreshCacheInfo = async () => {
     const info = await GetCacheInfo();
@@ -328,7 +342,14 @@ function App() {
   return (
     <div className={`h-screen flex flex-col ${THEME.bg} text-gray-200 font-sans overflow-hidden border border-gray-800/50 relative`}>
       
-      <DownloadModal isOpen={isDownloading} progress={downloadProgress} status={downloadStatus} />
+      <ModelInitModal 
+        step={initStep} 
+        missing={missingModels} 
+        progress={downloadProgress} 
+        status={downloadStatus} 
+        onDownload={handleStartDownload}
+        onManualCheck={handleManualCheck}
+      />
 
       {isDragging && (
         <div className="absolute inset-0 z-50 bg-[#121214]/90 backdrop-blur-md flex flex-col items-center justify-center border-4 border-[#E16B8C]/30 border-dashed rounded-lg animate-fade-in pointer-events-none">

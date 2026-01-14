@@ -22,6 +22,7 @@ export const ICONS = {
   ChevronDown: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>,
   Check: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
   Download: () => <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>,
+  Missing: () => <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
 };
 
 export const Button = ({ onClick, disabled, primary, icon, label, className }: any) => (
@@ -29,7 +30,7 @@ export const Button = ({ onClick, disabled, primary, icon, label, className }: a
     onClick={onClick}
     disabled={disabled}
     className={`
-      px-6 py-2.5 rounded-lg flex items-center gap-2 font-bold tracking-wide text-sm select-none transition-all duration-300 ease-out active:scale-95
+      px-6 py-2.5 rounded-lg flex items-center gap-2 font-bold tracking-wide text-sm select-none transition-all duration-300 ease-out active:scale-95 justify-center
       ${disabled 
         ? 'bg-[#1e1e24] text-gray-600 border border-gray-800 cursor-not-allowed' 
         : primary 
@@ -111,29 +112,80 @@ export const ProgressBar = ({ value, max, label }: any) => {
   )
 }
 
-export const DownloadModal = ({ isOpen, progress, status }: any) => {
-  if (!isOpen) return null;
+export const ModelInitModal = ({ step, missing, progress, status, onDownload, onManualCheck }: any) => {
+  if (step === 'idle') return null;
+
   return (
     <div className="absolute inset-0 z-100 bg-[#121214]/95 backdrop-blur-xl flex flex-col items-center justify-center animate-fade-in">
-        <div className="w-full max-w-md p-8 flex flex-col items-center gap-6">
-            <div className="p-6 rounded-full bg-[#E16B8C]/10 text-[#E16B8C] animate-bounce shadow-[0_0_40px_rgba(225,107,140,0.3)]">
-                <ICONS.Download />
-            </div>
-            <div className="text-center space-y-2">
-                <h2 className="text-2xl font-bold text-white tracking-widest">INITIALIZING</h2>
-                <p className="text-[#F596AA] font-mono text-sm">{status || "Checking required resources..."}</p>
-            </div>
-            <div className="w-full space-y-2">
-                <div className="h-2 w-full bg-[#1e1e24] rounded-full overflow-hidden border border-white/10">
-                    <div 
-                        className="h-full bg-[#E16B8C] shadow-[0_0_15px_rgba(225,107,140,0.8)] transition-all duration-300 ease-out" 
-                        style={{ width: `${progress}%` }}
-                    />
-                </div>
-                <div className="flex justify-end text-[10px] font-mono text-gray-500">
-                    {progress}% COMPLETE
-                </div>
-            </div>
+        <div className="w-full max-w-lg p-10 flex flex-col items-center gap-8 bg-[#18181b]/50 border border-[#E16B8C]/10 rounded-3xl shadow-2xl">
+            
+            {step === 'check' && (
+                <>
+                    <div className="p-6 rounded-full bg-[#E16B8C]/10 text-[#E16B8C] animate-pulse">
+                        <ICONS.Cache />
+                    </div>
+                    <h2 className="text-xl font-bold text-white tracking-widest">CHECKING RESOURCES...</h2>
+                </>
+            )}
+
+            {step === 'prompt' && (
+                <>
+                    <div className="p-6 rounded-full bg-yellow-500/10 text-yellow-500 shadow-[0_0_40px_rgba(234,179,8,0.2)]">
+                        <ICONS.Missing />
+                    </div>
+                    <div className="text-center space-y-2">
+                        <h2 className="text-xl font-bold text-white tracking-widest">MISSING MODELS DETECTED</h2>
+                        <p className="text-gray-400 text-sm">The following AI models are required to run the application:</p>
+                    </div>
+                    <div className="w-full bg-[#1e1e24] rounded-xl p-4 border border-white/5">
+                        <ul className="space-y-2">
+                            {missing.map((m: string, i: number) => (
+                                <li key={i} className="text-xs text-[#F596AA] font-mono flex items-center gap-2">
+                                    <span className="text-[#E16B8C]">●</span> {m}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                    <div className="flex flex-col gap-3 w-full pt-2">
+                        <Button 
+                            primary 
+                            onClick={onDownload} 
+                            label="DOWNLOAD AUTOMATICALLY" 
+                            icon={<ICONS.Download />}
+                            className="w-full py-4"
+                        />
+                        <button 
+                            onClick={onManualCheck}
+                            className="text-xs text-gray-500 hover:text-gray-300 transition-colors py-2"
+                        >
+                            I have placed them manually (Re-scan)
+                        </button>
+                    </div>
+                </>
+            )}
+
+            {step === 'downloading' && (
+                <>
+                    <div className="p-6 rounded-full bg-[#E16B8C]/10 text-[#E16B8C] animate-bounce shadow-[0_0_40px_rgba(225,107,140,0.3)]">
+                        <ICONS.Download />
+                    </div>
+                    <div className="text-center space-y-2">
+                        <h2 className="text-2xl font-bold text-white tracking-widest">INSTALLING</h2>
+                        <p className="text-[#F596AA] font-mono text-sm">{status || "Initializing..."}</p>
+                    </div>
+                    <div className="w-full space-y-2">
+                        <div className="h-2 w-full bg-[#1e1e24] rounded-full overflow-hidden border border-white/10">
+                            <div 
+                                className="h-full bg-[#E16B8C] shadow-[0_0_15px_rgba(225,107,140,0.8)] transition-all duration-300 ease-out" 
+                                style={{ width: `${progress}%` }}
+                            />
+                        </div>
+                        <div className="flex justify-end text-[10px] font-mono text-gray-500">
+                            {progress}% COMPLETE
+                        </div>
+                    </div>
+                </>
+            )}
         </div>
     </div>
   );

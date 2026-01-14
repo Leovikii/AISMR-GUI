@@ -134,24 +134,38 @@ func (a *App) performTimeBasedCleanup() {
 	}
 }
 
-func (a *App) CheckModels() error {
+func (a *App) ScanModels() []string {
 	cwd, _ := os.Getwd()
 	coreDir := filepath.Join(cwd, "core")
 	pythonExe := filepath.Join(coreDir, "python", "python.exe")
 	utilsPath := filepath.Join(coreDir, "scripts", "utils.py")
 
-	if _, err := os.Stat(pythonExe); os.IsNotExist(err) {
-		return fmt.Errorf("Python environment not found")
+	cmd := exec.Command(pythonExe, utilsPath, "--scan")
+	cmd.Dir = filepath.Join(coreDir, "scripts")
+	if stdruntime.GOOS == "windows" {
+		cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
 	}
 
-	cmd := exec.Command(pythonExe, utilsPath, "--check")
-	cmd.Dir = filepath.Join(coreDir, "scripts")
+	output, err := cmd.Output()
+	if err != nil {
+		return []string{}
+	}
 
+	var missing []string
+	json.Unmarshal(output, &missing)
+	return missing
+}
+
+func (a *App) DownloadModels() error {
+	cwd, _ := os.Getwd()
+	coreDir := filepath.Join(cwd, "core")
+	pythonExe := filepath.Join(coreDir, "python", "python.exe")
+	utilsPath := filepath.Join(coreDir, "scripts", "utils.py")
+
+	cmd := exec.Command(pythonExe, utilsPath, "--download")
+	cmd.Dir = filepath.Join(coreDir, "scripts")
 	if stdruntime.GOOS == "windows" {
-		cmd.SysProcAttr = &syscall.SysProcAttr{
-			HideWindow:    true,
-			CreationFlags: 0x08000000,
-		}
+		cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
 	}
 
 	stdout, _ := cmd.StdoutPipe()
@@ -170,7 +184,6 @@ func (a *App) CheckModels() error {
 			runtime.EventsEmit(a.ctx, "model-download-done", true)
 		}
 	}
-
 	return cmd.Wait()
 }
 

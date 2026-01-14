@@ -17,6 +17,11 @@ BIN_DIR = os.path.join(PROJECT_ROOT, "bin")
 QWEN_URL = "https://huggingface.co/unsloth/Qwen3-4B-Instruct-2507-GGUF/resolve/main/Qwen3-4B-Instruct-2507-Q6_K.gguf?download=true"
 SAKURA_URL = "https://huggingface.co/SakuraLLM/GalTransl-v4-4B-2512/resolve/main/GalTransl-v4-4B-2512.gguf?download=true"
 
+MODELS_CONFIG = [
+    {"url": QWEN_URL, "path": os.path.join(LLM_DIR, "Qwen3-4B-Instruct-2507-Q6_K.gguf"), "name": "Context AI (Qwen)"},
+    {"url": SAKURA_URL, "path": os.path.join(LLM_DIR, "GalTransl-v4-4B-2512.gguf"), "name": "Translator AI (Sakura)"}
+]
+
 def ensure_directory(path):
     if not os.path.exists(path):
         os.makedirs(path)
@@ -26,6 +31,19 @@ def get_cache_dir(input_file):
     cache_dir = os.path.join(CACHE_ROOT, base_name)
     ensure_directory(cache_dir)
     return cache_dir
+
+def get_qwen_model():
+    return MODELS_CONFIG[0]["path"]
+
+def get_sakura_model():
+    return MODELS_CONFIG[1]["path"]
+
+def scan_models():
+    missing = []
+    for m in MODELS_CONFIG:
+        if not os.path.exists(m["path"]):
+            missing.append(m["name"])
+    print(json.dumps(missing))
 
 def download_file_with_progress(url, dest_path, label):
     if os.path.exists(dest_path):
@@ -58,22 +76,11 @@ def download_file_with_progress(url, dest_path, label):
         return False
     return True
 
-def check_models():
-    models = [
-        (QWEN_URL, os.path.join(LLM_DIR, "Qwen3-4B-Instruct-2507-Q6_K.gguf"), "Context AI (Qwen)"),
-        (SAKURA_URL, os.path.join(LLM_DIR, "GalTransl-v4-4B-2512.gguf"), "Translator AI (Sakura)")
-    ]
-
-    missing = [m for m in models if not os.path.exists(m[1])]
-    
-    if not missing:
-        print("DONE")
-        return
-
-    for url, path, label in missing:
-        if not download_file_with_progress(url, path, label):
-            sys.exit(1)
-            
+def download_models():
+    for m in MODELS_CONFIG:
+        if not os.path.exists(m["path"]):
+            if not download_file_with_progress(m["url"], m["path"], m["name"]):
+                sys.exit(1)
     print("DONE")
 
 def load_asmr_dict():
@@ -112,5 +119,8 @@ class LocalLLM:
             raise
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1] == "--check":
-        check_models()
+    if len(sys.argv) > 1:
+        if sys.argv[1] == "--scan":
+            scan_models()
+        elif sys.argv[1] == "--download":
+            download_models()
