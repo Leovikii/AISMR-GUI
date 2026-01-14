@@ -21,6 +21,7 @@ export const ICONS = {
   Cache: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" /></svg>,
   ChevronDown: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>,
   Check: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+  Download: () => <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>,
 };
 
 export const Button = ({ onClick, disabled, primary, icon, label, className }: any) => (
@@ -109,6 +110,34 @@ export const ProgressBar = ({ value, max, label }: any) => {
     </div>
   )
 }
+
+export const DownloadModal = ({ isOpen, progress, status }: any) => {
+  if (!isOpen) return null;
+  return (
+    <div className="absolute inset-0 z-100 bg-[#121214]/95 backdrop-blur-xl flex flex-col items-center justify-center animate-fade-in">
+        <div className="w-full max-w-md p-8 flex flex-col items-center gap-6">
+            <div className="p-6 rounded-full bg-[#E16B8C]/10 text-[#E16B8C] animate-bounce shadow-[0_0_40px_rgba(225,107,140,0.3)]">
+                <ICONS.Download />
+            </div>
+            <div className="text-center space-y-2">
+                <h2 className="text-2xl font-bold text-white tracking-widest">INITIALIZING</h2>
+                <p className="text-[#F596AA] font-mono text-sm">{status || "Checking required resources..."}</p>
+            </div>
+            <div className="w-full space-y-2">
+                <div className="h-2 w-full bg-[#1e1e24] rounded-full overflow-hidden border border-white/10">
+                    <div 
+                        className="h-full bg-[#E16B8C] shadow-[0_0_15px_rgba(225,107,140,0.8)] transition-all duration-300 ease-out" 
+                        style={{ width: `${progress}%` }}
+                    />
+                </div>
+                <div className="flex justify-end text-[10px] font-mono text-gray-500">
+                    {progress}% COMPLETE
+                </div>
+            </div>
+        </div>
+    </div>
+  );
+};
 
 export type ProcessStatus = 'pending' | 'preparing' | 'whispering' | 'correcting' | 'translating' | 'exporting' | 'done' | 'error';
 

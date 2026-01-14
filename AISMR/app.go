@@ -11,6 +11,7 @@ import (
 	stdruntime "runtime"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -131,6 +132,46 @@ func (a *App) performTimeBasedCleanup() {
 			a.log("Auto-cleaned old cache: " + entry.Name())
 		}
 	}
+}
+
+func (a *App) CheckModels() error {
+	cwd, _ := os.Getwd()
+	coreDir := filepath.Join(cwd, "core")
+	pythonExe := filepath.Join(coreDir, "python", "python.exe")
+	utilsPath := filepath.Join(coreDir, "scripts", "utils.py")
+
+	if _, err := os.Stat(pythonExe); os.IsNotExist(err) {
+		return fmt.Errorf("Python environment not found")
+	}
+
+	cmd := exec.Command(pythonExe, utilsPath, "--check")
+	cmd.Dir = filepath.Join(coreDir, "scripts")
+
+	if stdruntime.GOOS == "windows" {
+		cmd.SysProcAttr = &syscall.SysProcAttr{
+			HideWindow:    true,
+			CreationFlags: 0x08000000,
+		}
+	}
+
+	stdout, _ := cmd.StdoutPipe()
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+
+	scanner := bufio.NewScanner(stdout)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "PROGRESS:") {
+			runtime.EventsEmit(a.ctx, "model-download-progress", line)
+		} else if strings.HasPrefix(line, "STATUS:") {
+			runtime.EventsEmit(a.ctx, "model-download-status", line)
+		} else if line == "DONE" {
+			runtime.EventsEmit(a.ctx, "model-download-done", true)
+		}
+	}
+
+	return cmd.Wait()
 }
 
 func (a *App) ProcessPaths(paths []string) []FileItem {
@@ -257,6 +298,13 @@ func (a *App) RunScript(targetPath string) error {
 	newPath := fmt.Sprintf("%s%c%s%c%s%c%s", ffmpegPath, os.PathListSeparator, llamaPath, os.PathListSeparator, os.Getenv(pathKey), os.PathListSeparator, binPath)
 	env = append(env, fmt.Sprintf("%s=%s", pathKey, newPath))
 	cmd.Env = env
+
+	if stdruntime.GOOS == "windows" {
+		cmd.SysProcAttr = &syscall.SysProcAttr{
+			HideWindow:    true,
+			CreationFlags: 0x08000000,
+		}
+	}
 
 	stdout, _ := cmd.StdoutPipe()
 	stderr, _ := cmd.StderrPipe()

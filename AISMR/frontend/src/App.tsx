@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { SelectFile, SelectFolder, RunScript, ProcessPaths, GetCacheInfo, ClearCache, GetSettings, SetSettings } from "../wailsjs/go/main/App";
+import { SelectFile, SelectFolder, RunScript, ProcessPaths, GetCacheInfo, ClearCache, GetSettings, SetSettings, CheckModels } from "../wailsjs/go/main/App";
 import { WindowMinimise, Quit, EventsOn, EventsOff, OnFileDrop } from "../wailsjs/runtime/runtime";
-import { THEME, ICONS, Button, CustomSelect, ProgressBar, StatusBadge, ProcessStatus } from "./components/Shared";
+import { THEME, ICONS, Button, CustomSelect, ProgressBar, StatusBadge, ProcessStatus, DownloadModal } from "./components/Shared";
 
 interface FileItem {
   id: string;
@@ -71,7 +71,6 @@ const DashboardView = ({
 }: any) => {
     return (
         <div className="flex-1 flex flex-col overflow-hidden animate-slide-up">
-            {/* Control Bar */}
             <div className="h-24 flex items-center px-8 gap-6 bg-[#141417]/60 backdrop-blur-sm relative z-20 shrink-0">
                 <div className="relative" ref={importMenuRef}>
                     <Button 
@@ -111,10 +110,7 @@ const DashboardView = ({
                 />
             </div>
 
-            {/* Main Content Area */}
             <div className="flex-1 overflow-hidden p-8 pt-2 flex flex-col gap-6">
-                
-                {/* File Queue Panel */}
                 <div className="flex-1 bg-[#0c0c0e] rounded-2xl border border-gray-800/60 overflow-hidden flex flex-col shadow-inner relative transition-colors duration-500 hover:border-gray-700/50">
                     <div className="h-12 border-b border-gray-800/60 flex items-center justify-between px-6 bg-[#141417] select-none">
                         <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
@@ -158,7 +154,6 @@ const DashboardView = ({
                     </div>
                 </div>
 
-                {/* System Log Panel (Unified Style) */}
                 <div className="h-40 bg-[#0c0c0e] rounded-2xl border border-gray-800/60 overflow-hidden flex flex-col shadow-inner relative transition-colors duration-500 hover:border-gray-700/50 shrink-0">
                     <div className="h-10 border-b border-gray-800/60 flex items-center justify-between px-6 bg-[#141417] select-none">
                         <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
@@ -193,10 +188,13 @@ function App() {
   const [isDragging, setIsDragging] = useState(false);
   
   const [currentView, setCurrentView] = useState<'dashboard' | 'settings'>('dashboard');
-  
   const [cacheSize, setCacheSize] = useState<number>(0);
   const [cacheStrategy, setCacheStrategy] = useState<string>("off");
   
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [downloadStatus, setDownloadStatus] = useState("");
+
   const logEndRef = useRef<HTMLDivElement>(null);
   const currentIndexRef = useRef<number | null>(null);
   const importMenuRef = useRef<HTMLDivElement>(null);
@@ -238,8 +236,33 @@ function App() {
       else if (msg.includes("RUNNING: _3_translate.py")) updateStatus(idx, 'translating');
       else if (msg.includes("RUNNING: _4_output.py")) updateStatus(idx, 'exporting');
     };
+    
+    // Model Download Events
+    const dlProgress = (msg: string) => {
+        setIsDownloading(true);
+        const p = parseInt(msg.replace("PROGRESS: ", ""));
+        if (!isNaN(p)) setDownloadProgress(p);
+    };
+    const dlStatus = (msg: string) => {
+        setIsDownloading(true);
+        setDownloadStatus(msg.replace("STATUS: ", ""));
+    };
+    const dlDone = () => {
+        setIsDownloading(false);
+        setDownloadStatus("Ready");
+    };
+
     EventsOn("log-message", logHandler);
-    return () => EventsOff("log-message");
+    EventsOn("model-download-progress", dlProgress);
+    EventsOn("model-download-status", dlStatus);
+    EventsOn("model-download-done", dlDone);
+    
+    return () => {
+        EventsOff("log-message");
+        EventsOff("model-download-progress");
+        EventsOff("model-download-status");
+        EventsOff("model-download-done");
+    };
   }, []);
 
   useEffect(() => { logEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [logs]);
@@ -247,6 +270,11 @@ function App() {
   useEffect(() => {
     refreshCacheInfo();
     GetSettings().then(cfg => { if(cfg && cfg.cacheStrategy) setCacheStrategy(cfg.cacheStrategy); });
+    
+    // Check models on startup
+    CheckModels().catch(err => {
+        addLog(`[System] Model check failed: ${err}`);
+    });
   }, []);
 
   const refreshCacheInfo = async () => {
@@ -299,6 +327,9 @@ function App() {
 
   return (
     <div className={`h-screen flex flex-col ${THEME.bg} text-gray-200 font-sans overflow-hidden border border-gray-800/50 relative`}>
+      
+      <DownloadModal isOpen={isDownloading} progress={downloadProgress} status={downloadStatus} />
+
       {isDragging && (
         <div className="absolute inset-0 z-50 bg-[#121214]/90 backdrop-blur-md flex flex-col items-center justify-center border-4 border-[#E16B8C]/30 border-dashed rounded-lg animate-fade-in pointer-events-none">
             <div className="p-6 rounded-full bg-[#E16B8C]/10 mb-4 animate-bounce shadow-[0_0_30px_rgba(225,107,140,0.3)]"><ICONS.Import /></div>

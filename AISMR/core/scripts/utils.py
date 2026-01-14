@@ -27,31 +27,64 @@ def get_cache_dir(input_file):
     ensure_directory(cache_dir)
     return cache_dir
 
-def download_model(url, dest_path):
+def download_file_with_progress(url, dest_path, label):
     if os.path.exists(dest_path):
-        return dest_path
+        return True
+    
     ensure_directory(os.path.dirname(dest_path))
-    print(f"Downloading model to {dest_path}...")
-    response = requests.get(url, stream=True)
-    total_size = int(response.headers.get('content-length', 0))
-    block_size = 1024 * 1024
-    downloaded = 0
-    with open(dest_path, 'wb') as f:
-        for data in response.iter_content(1024):
-            f.write(data)
-            downloaded += len(data)
-            if downloaded % (10 * 1024 * 1024) < 1024:
-                print(f"Downloaded {downloaded // (1024*1024)} MB / {total_size // (1024*1024)} MB")
-    print("Download complete.")
-    return dest_path
+    
+    print(f"STATUS: Downloading {label}...")
+    sys.stdout.flush()
+    
+    try:
+        response = requests.get(url, stream=True)
+        response.raise_for_status()
+        total_size = int(response.headers.get('content-length', 0))
+        block_size = 8192
+        downloaded = 0
+        
+        with open(dest_path, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=block_size):
+                if chunk:
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    if total_size > 0:
+                        percent = int((downloaded / total_size) * 100)
+                        print(f"PROGRESS: {percent}")
+                        sys.stdout.flush()
+    except Exception as e:
+        print(f"ERROR: {str(e)}")
+        sys.stdout.flush()
+        return False
+    return True
 
-def get_qwen_model():
-    model_path = os.path.join(LLM_DIR, "Qwen3-4B-Instruct-2507-Q6_K.gguf")
-    return download_model(QWEN_URL, model_path)
+def check_models():
+    models = [
+        (QWEN_URL, os.path.join(LLM_DIR, "Qwen3-4B-Instruct-2507-Q6_K.gguf"), "Context AI (Qwen)"),
+        (SAKURA_URL, os.path.join(LLM_DIR, "GalTransl-v4-4B-2512.gguf"), "Translator AI (Sakura)")
+    ]
 
-def get_sakura_model():
-    model_path = os.path.join(LLM_DIR, "GalTransl-v4-4B-2512.gguf")
-    return download_model(SAKURA_URL, model_path)
+    missing = [m for m in models if not os.path.exists(m[1])]
+    
+    if not missing:
+        print("DONE")
+        return
+
+    for url, path, label in missing:
+        if not download_file_with_progress(url, path, label):
+            sys.exit(1)
+            
+    print("DONE")
+
+def load_asmr_dict():
+    dict_path = os.path.join(ASSETS_DIR, "asmr_dictionary.json")
+    if not os.path.exists(dict_path):
+        return []
+    try:
+        with open(dict_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except:
+        return []
 
 class LocalLLM:
     def __init__(self, port=8080):
@@ -78,20 +111,6 @@ class LocalLLM:
         except Exception as e:
             raise
 
-def load_asmr_dict():
-    dict_path = os.path.join(ASSETS_DIR, "asmr_dictionary.json")
-    if not os.path.exists(dict_path):
-        return []
-    try:
-        with open(dict_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except:
-        return []
-
-def get_whisper_prompt_from_dict():
-    data = load_asmr_dict()
-    terms = [item['term'] for item in data]
-    base = "これは、男性向けのASMR音声作品です。"
-    if terms:
-        return base + " 登場用語: " + "、".join(terms[:30]) + "。"
-    return base
+if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "--check":
+        check_models()
