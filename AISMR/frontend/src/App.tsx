@@ -66,10 +66,12 @@ const SettingsView = ({ onBack, cacheSize, cacheStrategy, onStrategyChange, onCl
 
 const DashboardView = ({ 
     files, isRunning, importMenuRef, showImportMenu, setShowImportMenu, 
-    handleImportFile, handleImportFolder, runQueue, removeFile, clearList
+    handleImportFile, handleImportFolder, runQueue, removeFile, clearList,
+    logs, setLogs, logEndRef
 }: any) => {
     return (
         <div className="flex-1 flex flex-col overflow-hidden animate-slide-up">
+            {/* Control Bar */}
             <div className="h-24 flex items-center px-8 gap-6 bg-[#141417]/60 backdrop-blur-sm relative z-20 shrink-0">
                 <div className="relative" ref={importMenuRef}>
                     <Button 
@@ -109,7 +111,10 @@ const DashboardView = ({
                 />
             </div>
 
+            {/* Main Content Area */}
             <div className="flex-1 overflow-hidden p-8 pt-2 flex flex-col gap-6">
+                
+                {/* File Queue Panel */}
                 <div className="flex-1 bg-[#0c0c0e] rounded-2xl border border-gray-800/60 overflow-hidden flex flex-col shadow-inner relative transition-colors duration-500 hover:border-gray-700/50">
                     <div className="h-12 border-b border-gray-800/60 flex items-center justify-between px-6 bg-[#141417] select-none">
                         <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
@@ -152,6 +157,28 @@ const DashboardView = ({
                         )}
                     </div>
                 </div>
+
+                {/* System Log Panel (Unified Style) */}
+                <div className="h-40 bg-[#0c0c0e] rounded-2xl border border-gray-800/60 overflow-hidden flex flex-col shadow-inner relative transition-colors duration-500 hover:border-gray-700/50 shrink-0">
+                    <div className="h-10 border-b border-gray-800/60 flex items-center justify-between px-6 bg-[#141417] select-none">
+                        <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                            <div className={`w-1.5 h-1.5 rounded-full ${isRunning ? 'bg-[#E16B8C] animate-pulse' : 'bg-gray-700'}`}></div>
+                            SYSTEM OUTPUT
+                        </div>
+                        <button onClick={() => setLogs([])} className="text-[10px] text-gray-600 hover:text-gray-400 px-2 py-1 rounded hover:bg-white/5 transition-colors">
+                            CLEAR LOGS
+                        </button>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-4 space-y-1 text-gray-500 custom-scrollbar font-mono text-[11px]">
+                        {logs.map((log: string, i: number) => (
+                            <div key={i} className="wrap-break-word border-l-2 border-transparent pl-2 hover:bg-white/5 opacity-80 hover:opacity-100 hover:border-gray-800 transition-colors">
+                                {log}
+                            </div>
+                        ))}
+                        <div ref={logEndRef} />
+                    </div>
+                </div>
+
             </div>
         </div>
     )
@@ -320,25 +347,10 @@ function App() {
             runQueue={runQueue}
             removeFile={removeFile}
             clearList={clearList}
+            logs={logs}
+            setLogs={setLogs}
+            logEndRef={logEndRef}
           />
-      )}
-
-      {currentView === 'dashboard' && (
-      <div className="h-32 bg-[#0c0c0e] rounded-t-xl border-t border-gray-800/60 flex flex-col font-mono text-[11px] overflow-hidden shadow-[0_-10px_40px_rgba(0,0,0,0.3)] shrink-0 animate-slide-up">
-          <div className="px-4 py-2 bg-[#141417] border-b border-gray-800/60 flex justify-between items-center select-none">
-            <span className="text-gray-500 font-bold uppercase tracking-widest text-[10px] flex items-center gap-2">
-              <div className={`w-1.5 h-1.5 rounded-full ${isRunning ? 'bg-[#E16B8C] animate-pulse' : 'bg-gray-700'}`}></div>
-              SYSTEM OUTPUT
-            </span>
-            <button onClick={() => setLogs([])} className="text-gray-600 hover:text-gray-400 transition-colors">CLEAR</button>
-          </div>
-          <div className="flex-1 overflow-y-auto p-4 space-y-1 text-gray-500 custom-scrollbar">
-              {logs.map((log, i) => (
-                  <div key={i} className="wrap-break-word border-l-2 border-transparent pl-2 hover:bg-white/5 opacity-80 hover:opacity-100 hover:border-gray-800 transition-colors">{log}</div>
-              ))}
-              <div ref={logEndRef} />
-          </div>
-      </div>
       )}
 
       <style>{`
