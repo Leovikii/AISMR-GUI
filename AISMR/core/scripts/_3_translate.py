@@ -2,7 +2,8 @@ import os
 import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 import json
-from utils import LocalLLM, get_cache_dir, load_asmr_dict
+import glob
+from utils import LocalLLM, get_cache_dir, load_asmr_dict, get_assets_context_path, PROMPTS_DIR
 
 BATCH_SIZE = 10
 MAX_HISTORY = 5
@@ -33,15 +34,28 @@ def load_filtered_glossary(full_text):
     except: pass
     return "\n".join(relevant_glossary)
 
-def load_context_info(cache_dir):
+def load_context_info(input_file):
     summary = ""
     style = ""
-    try:
-        with open(os.path.join(cache_dir, "context.json"), "r", encoding="utf-8") as f:
-            d = json.load(f)
-            summary = d.get("summary", "")
-            style = d.get("style", "")
-    except: pass
+
+    prompt_file_name = "default.txt"
+    if os.path.exists(PROMPTS_DIR):
+        txt_files = glob.glob(os.path.join(PROMPTS_DIR, "*.txt"))
+        if txt_files:
+            prompt_file_name = os.path.basename(txt_files[0])
+    elif os.path.exists("ReadMe.txt"):
+        prompt_file_name = "ReadMe.txt"
+
+    context_file = get_assets_context_path(prompt_file_name)
+    if os.path.exists(context_file):
+        try:
+            with open(context_file, "r", encoding="utf-8") as f:
+                d = json.load(f)
+                summary = d.get("summary", "")
+                style = d.get("style", "")
+        except:
+            pass
+
     return summary, style
 
 def recursive_translate(llm, items, history, context_tuple):
@@ -81,38 +95,37 @@ def recursive_translate(llm, items, history, context_tuple):
 
 def main():
     if len(sys.argv) < 2: sys.exit(1)
-    cache_dir = get_cache_dir(sys.argv[1])
+    print("STATUS: Loading Translation Data", flush=True)
+
+    input_file = sys.argv[1]
+    cache_dir = get_cache_dir(input_file)
     inp_srt = os.path.join(cache_dir, "corrected.srt")
     trans_srt = os.path.join(cache_dir, "translated.srt")
-    
+
     if os.path.exists(trans_srt) and os.path.getsize(trans_srt) > 0:
         sys.exit(0)
-    
+
     if not os.path.exists(inp_srt):
         sys.exit(1)
-    
+
     entries = parse_srt(inp_srt)
-    
-    # 1. 提取全文内容用于过滤术语
+
     full_text = "".join([e['text'] for e in entries])
-    
-    # 2. 生成过滤后的精简术语表
     glossary_str = load_filtered_glossary(full_text)
-    
-    # 3. 加载背景信息
-    summary, style = load_context_info(cache_dir)
+    summary, style = load_context_info(input_file)
     context_tuple = (summary, style, glossary_str)
-    
+
     llm = LocalLLM(port=int(os.environ.get("LLM_PORT", 8080)))
-    
+
     history = []
     total_batches = (len(entries) + BATCH_SIZE - 1) // BATCH_SIZE
-    
+
+    print("STATUS: Translating Text", flush=True)
     for i in range(0, len(entries), BATCH_SIZE):
         batch = entries[i:i+BATCH_SIZE]
         current_batch_num = i // BATCH_SIZE + 1
         print(f"Translating batch {current_batch_num}/{total_batches}...", flush=True)
-        
+
         results = recursive_translate(llm, batch, history, context_tuple)
         save_srt_append(trans_srt, [{'index': b['index'], 'timestamp': b['timestamp'], 'text': r} for b, r in zip(batch, results)])
         history = (history + results)[-MAX_HISTORY:]

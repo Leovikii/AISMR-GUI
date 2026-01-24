@@ -3,9 +3,10 @@ import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 import json
 import re
+import glob
 import pykakasi
 from difflib import SequenceMatcher
-from utils import get_cache_dir, load_asmr_dict
+from utils import get_cache_dir, load_asmr_dict, load_temp_dict, PROMPTS_DIR
 
 def get_acoustic_fingerprint(text):
     if not text: return ""
@@ -21,12 +22,30 @@ def get_acoustic_fingerprint(text):
     s = re.sub(r'([a-z])\1+', r'\1', s)
     return s
 
-def load_correction_data():
-    data = load_asmr_dict()
+def load_correction_data(input_file):
+    """Load both global and temporary dictionaries"""
+    # Load global dictionary
+    global_data = load_asmr_dict()
+
+    # Get prompt file name
+    prompt_file_name = "default.txt"
+    if os.path.exists(PROMPTS_DIR):
+        txt_files = glob.glob(os.path.join(PROMPTS_DIR, "*.txt"))
+        if txt_files:
+            prompt_file_name = os.path.basename(txt_files[0])
+    elif os.path.exists("ReadMe.txt"):
+        prompt_file_name = "ReadMe.txt"
+
+    # Load temporary dictionary for this file
+    temp_data = load_temp_dict(prompt_file_name)
+
+    # Merge both dictionaries
+    all_data = global_data + temp_data
+
     replace_map = {}
     phonetic_map = {}
     noise_keywords = []
-    for item in data:
+    for item in all_data:
         term = item['term']
         if item.get('type') == 'noise':
             noise_keywords.append(term)
@@ -88,20 +107,28 @@ def are_similar(t1, t2):
     return SequenceMatcher(None, t1, t2).ratio() > 0.6
 
 def process_correction(input_file):
+    print("STATUS: Loading Correction Data", flush=True)
+
+    if not os.path.exists(input_file):
+        print(f"ERROR: Input file not found: {input_file}", flush=True)
+        sys.exit(1)
+
     cache_dir = get_cache_dir(input_file)
     raw_srt = os.path.join(cache_dir, "raw.srt")
     corrected_srt = os.path.join(cache_dir, "corrected.srt")
-    
+
     if os.path.exists(corrected_srt) and os.path.getsize(corrected_srt) > 0:
         return
-    
+
     if not os.path.exists(raw_srt):
+        print(f"ERROR: Raw SRT not found: {raw_srt}", flush=True)
         sys.exit(1)
-        
-    replace_map, phonetic_map, noise_keywords = load_correction_data()
+
+    replace_map, phonetic_map, noise_keywords = load_correction_data(input_file)
     entries = parse_srt(raw_srt)
     kks = pykakasi.kakasi()
-    
+
+    print("STATUS: Correcting Text", flush=True)
     processed_entries = []
     for entry in entries:
         t = entry['text']

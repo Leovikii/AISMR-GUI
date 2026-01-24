@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { SelectFile, SelectFolder, RunScript, ProcessPaths, GetCacheInfo, ClearCache, GetSettings, SetSettings, ScanModels, DownloadModels } from "../wailsjs/go/main/App";
+import { SelectFile, SelectFolder, RunScript, StopScript, ProcessPaths, GetCacheInfo, ClearCache, GetSettings, SetSettings, ScanModels, DownloadModels } from "../wailsjs/go/main/App";
 import { WindowMinimise, Quit, EventsOn, EventsOff, OnFileDrop } from "../wailsjs/runtime/runtime";
 import { THEME, ICONS, Button, CustomSelect, ProgressBar, StatusBadge, ProcessStatus, ModelInitModal } from "./components/Shared";
 
@@ -64,9 +64,9 @@ const SettingsView = ({ onBack, cacheSize, cacheStrategy, onStrategyChange, onCl
     )
 }
 
-const DashboardView = ({ 
-    files, isRunning, importMenuRef, showImportMenu, setShowImportMenu, 
-    handleImportFile, handleImportFolder, runQueue, removeFile, clearList,
+const DashboardView = ({
+    files, isRunning, importMenuRef, showImportMenu, setShowImportMenu,
+    handleImportFile, handleImportFolder, runQueue, stopQueue, removeFile, clearList,
     logs, setLogs, logEndRef
 }: any) => {
     return (
@@ -100,12 +100,12 @@ const DashboardView = ({
                     </div>
                 </div>
 
-                <Button 
-                    primary 
-                    onClick={runQueue} 
-                    disabled={isRunning || files.length === 0}
-                    icon={isRunning ? <span className="animate-spin">🌸</span> : <ICONS.Play />}
-                    label={isRunning ? 'PROCESSING...' : 'START QUEUE'}
+                <Button
+                    primary
+                    onClick={isRunning ? stopQueue : runQueue}
+                    disabled={!isRunning && files.length === 0}
+                    icon={isRunning ? <ICONS.Clear /> : <ICONS.Play />}
+                    label={isRunning ? 'STOP' : 'START QUEUE'}
                     className="px-8 py-3 text-base"
                 />
             </div>
@@ -231,15 +231,15 @@ function App() {
       setLogs((prev) => [...prev, msg]);
       const idx = currentIndexRef.current;
       if (idx === null) return;
-      
+
       // Update status based on script output
       if (msg.includes("STATUS: Audio Normalization")) updateStatus(idx, 'normalizing');
-      else if (msg.includes("STATUS: Context Analysis")) updateStatus(idx, 'analyzing');
+      else if (msg.includes("STATUS: Context Analysis") || msg.includes("STATUS: Extracting Terms")) updateStatus(idx, 'analyzing');
       else if (msg.includes("RUNNING: _0_prepare.py")) updateStatus(idx, 'preparing');
-      else if (msg.includes("RUNNING: _1_whisper.py")) updateStatus(idx, 'whispering');
-      else if (msg.includes("RUNNING: _2_correct.py")) updateStatus(idx, 'correcting');
-      else if (msg.includes("RUNNING: _3_translate.py")) updateStatus(idx, 'translating');
-      else if (msg.includes("RUNNING: _4_output.py")) updateStatus(idx, 'exporting');
+      else if (msg.includes("RUNNING: _1_whisper.py") || msg.includes("STATUS: Loading Whisper Model") || msg.includes("STATUS: Transcribing Audio")) updateStatus(idx, 'whispering');
+      else if (msg.includes("RUNNING: _2_correct.py") || msg.includes("STATUS: Loading Correction Data") || msg.includes("STATUS: Correcting Text")) updateStatus(idx, 'correcting');
+      else if (msg.includes("RUNNING: _3_translate.py") || msg.includes("STATUS: Loading Translation Data") || msg.includes("STATUS: Translating Text")) updateStatus(idx, 'translating');
+      else if (msg.includes("RUNNING: _4_output.py") || msg.includes("STATUS: Generating Final Output")) updateStatus(idx, 'exporting');
     };
     
     // Model Download Events
@@ -333,14 +333,33 @@ function App() {
     for (let i = 0; i < files.length; i++) {
         if (files[i].status === 'done') continue;
         setCurrentIndex(i);
-        updateStatus(i, 'preparing'); 
+        updateStatus(i, 'preparing');
         addLog(`=== Processing [${i+1}/${files.length}]: ${files[i].name} ===`);
-        try { await RunScript(files[i].path); updateStatus(i, 'done'); } catch (e: any) { updateStatus(i, 'error'); addLog(`=== Error: ${e} ===`); }
+        try {
+            await RunScript(files[i].path);
+            updateStatus(i, 'done');
+        } catch (e: any) {
+            if (e && e.toString().includes("stopped")) {
+                addLog("=== Queue Stopped by User ===");
+                break;
+            }
+            updateStatus(i, 'error');
+            addLog(`=== Error: ${e} ===`);
+        }
     }
     setCurrentIndex(null);
     setIsRunning(false);
     refreshCacheInfo();
     addLog("=== Queue Finished ===");
+  };
+
+  const stopQueue = async () => {
+    if (!isRunning) return;
+    try {
+      await StopScript();
+    } catch (e: any) {
+      addLog(`=== Stop Error: ${e} ===`);
+    }
   };
 
   return (
@@ -392,7 +411,7 @@ function App() {
             onClearCache={handleClearCache}
           />
       ) : (
-          <DashboardView 
+          <DashboardView
             files={files}
             isRunning={isRunning}
             importMenuRef={importMenuRef}
@@ -401,6 +420,7 @@ function App() {
             handleImportFile={handleImportFile}
             handleImportFolder={handleImportFolder}
             runQueue={runQueue}
+            stopQueue={stopQueue}
             removeFile={removeFile}
             clearList={clearList}
             logs={logs}

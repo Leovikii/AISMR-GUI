@@ -20,6 +20,8 @@ import (
 type App struct {
 	ctx        context.Context
 	isRunning  bool
+	stopFlag   bool
+	currentCmd *exec.Cmd
 	mu         sync.Mutex
 	config     AppConfig
 	configPath string
@@ -264,11 +266,13 @@ func (a *App) RunScript(targetPath string) error {
 		return fmt.Errorf("任务正在运行中")
 	}
 	a.isRunning = true
+	a.stopFlag = false
 	a.mu.Unlock()
 
 	defer func() {
 		a.mu.Lock()
 		a.isRunning = false
+		a.currentCmd = nil
 		a.mu.Unlock()
 
 		if a.config.CacheStrategy == "immediate" {
@@ -283,6 +287,13 @@ func (a *App) RunScript(targetPath string) error {
 			}()
 		}
 	}()
+
+	a.mu.Lock()
+	if a.stopFlag {
+		a.mu.Unlock()
+		return fmt.Errorf("stopped")
+	}
+	a.mu.Unlock()
 
 	cwd, _ := os.Getwd()
 	coreDir := filepath.Join(cwd, "core")
@@ -310,12 +321,18 @@ func (a *App) RunScript(targetPath string) error {
 	}
 	newPath := fmt.Sprintf("%s%c%s%c%s%c%s", ffmpegPath, os.PathListSeparator, llamaPath, os.PathListSeparator, os.Getenv(pathKey), os.PathListSeparator, binPath)
 	env = append(env, fmt.Sprintf("%s=%s", pathKey, newPath))
+
+	// Set UTF-8 encoding for Python on Windows
+	if stdruntime.GOOS == "windows" {
+		env = append(env, "PYTHONIOENCODING=utf-8")
+	}
+
 	cmd.Env = env
 
 	if stdruntime.GOOS == "windows" {
 		cmd.SysProcAttr = &syscall.SysProcAttr{
 			HideWindow:    true,
-			CreationFlags: 0x08000000,
+			CreationFlags: 0x08000000 | 0x00000200,
 		}
 	}
 
@@ -326,6 +343,11 @@ func (a *App) RunScript(targetPath string) error {
 		a.log("启动失败: " + err.Error())
 		return err
 	}
+
+	// Store current command for stop functionality
+	a.mu.Lock()
+	a.currentCmd = cmd
+	a.mu.Unlock()
 
 	scannerOut := bufio.NewScanner(stdout)
 	scannerErr := bufio.NewScanner(stderr)
@@ -354,6 +376,37 @@ func (a *App) RunScript(targetPath string) error {
 	}
 
 	return nil
+}
+
+func (a *App) StopScript() error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	if !a.isRunning || a.currentCmd == nil {
+		return fmt.Errorf("没有正在运行的任务")
+	}
+
+	a.stopFlag = true
+
+	if a.currentCmd.Process != nil {
+		a.log("正在停止所有处理进程...")
+
+		if stdruntime.GOOS == "windows" {
+			exec.Command("taskkill", "/F", "/T", "/PID", fmt.Sprintf("%d", a.currentCmd.Process.Pid)).Run()
+		} else {
+			a.currentCmd.Process.Kill()
+		}
+
+		a.log("所有处理进程已停止")
+	}
+
+	return nil
+}
+
+func (a *App) ShouldStop() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.stopFlag
 }
 
 func (a *App) log(message string) {

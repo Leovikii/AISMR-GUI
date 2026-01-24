@@ -5,11 +5,12 @@
   "frontend:dev:watcher": "npm run dev",
   "frontend:dev:serverUrl": "auto",
   "author": {
-    "name": "User",
-    "email": "user@example.com"
+    "name": "Viki"
   },
   "info": {
-    "productVersion": "1.0.0",
+    "productName": "AISMR",
+    "companyName": "AISMR Inc.",
+    "productVersion": "1.1.0",
     "copyright": "© 2026 AISMR"
   },
   "windows": {
