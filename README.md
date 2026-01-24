@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-1.0.0-ff69b4.svg)
+![Version](https://img.shields.io/badge/version-2.0.0-ff69b4.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows-blue.svg)
 
@@ -29,7 +29,7 @@
 
 ## 🛠️ Tech Stack
 
-* **Frontend:** React, TypeScript, TailwindCSS
+* **Frontend:** Vue, TypeScript, TailwindCSS
 * **Backend:** Go (Wails v2)
 * **Core Logic:** Python (Embedded)
 * **Inference:** `llama.cpp`, `faster-whisper`
