@@ -13,11 +13,19 @@ def parse_time(ts):
 
 def main():
     if len(sys.argv) < 2: sys.exit(1)
+    print("STATUS: Generating Final Output", flush=True)
+
     inp = sys.argv[1]
+
+    if not os.path.exists(inp):
+        print(f"ERROR: Input file not found: {inp}", flush=True)
+        sys.exit(1)
+
     cache_dir = get_cache_dir(inp)
     src_srt = os.path.join(cache_dir, "translated.srt")
-    
+
     if not os.path.exists(src_srt):
+        print(f"ERROR: Translated SRT not found: {src_srt}", flush=True)
         sys.exit(1)
     
     base = os.path.splitext(inp)[0]

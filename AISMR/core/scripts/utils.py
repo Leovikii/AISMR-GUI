@@ -3,6 +3,7 @@ import sys
 import json
 import requests
 import time
+from pathlib import Path
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -27,7 +28,9 @@ def ensure_directory(path):
         os.makedirs(path)
 
 def get_cache_dir(input_file):
-    base_name = os.path.splitext(os.path.basename(input_file))[0]
+    # Use Path for better Unicode handling
+    input_path = Path(input_file)
+    base_name = input_path.stem
     cache_dir = os.path.join(CACHE_ROOT, base_name)
     ensure_directory(cache_dir)
     return cache_dir
@@ -92,6 +95,37 @@ def load_asmr_dict():
             return json.load(f)
     except:
         return []
+
+def get_assets_context_path(prompt_file_name):
+    """Get path for temporary context JSON in assets folder"""
+    base_name = os.path.splitext(prompt_file_name)[0]
+    return os.path.join(ASSETS_DIR, f"{base_name}_context.json")
+
+def get_assets_terms_path(prompt_file_name):
+    """Get path for temporary terms JSON in assets folder"""
+    base_name = os.path.splitext(prompt_file_name)[0]
+    return os.path.join(ASSETS_DIR, f"{base_name}_terms.json")
+
+def load_temp_dict(prompt_file_name):
+    """Load temporary dictionary for specific prompt file"""
+    terms_path = get_assets_terms_path(prompt_file_name)
+    if not os.path.exists(terms_path):
+        return []
+    try:
+        with open(terms_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except:
+        return []
+
+def get_final_output_path(input_file):
+    """Get the final output file path (.lrc or .srt)"""
+    input_path = Path(input_file)
+    base = input_path.stem
+    parent = input_path.parent
+    ext = input_path.suffix.lower()
+    is_audio = ext in ['.mp3', '.wav', '.flac', '.m4a', '.aac']
+    output_ext = '.lrc' if is_audio else '.srt'
+    return str(parent / f"{base}{output_ext}")
 
 class LocalLLM:
     def __init__(self, port=8080):

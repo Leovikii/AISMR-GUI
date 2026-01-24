@@ -3,8 +3,9 @@ import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 import json
 import re
+import glob
 from faster_whisper import WhisperModel
-from utils import WHISPER_DIR, get_cache_dir, load_asmr_dict
+from utils import WHISPER_DIR, get_cache_dir, load_asmr_dict, get_assets_context_path, PROMPTS_DIR
 
 MODEL_SIZE = "large-v2"
 COMPUTE_TYPE = "int8_float16"
@@ -52,11 +53,19 @@ def is_prompt_mirror(text, prompt):
     match_count = sum(1 for k in keywords if k in text)
     return match_count >= 3 and len(text) < sum(len(k) for k in keywords) * 2
 
-def build_smart_prompt(cache_dir):
+def build_smart_prompt(input_file):
     base_prompt = "这是、男性向けのASMR音声作品です。"
     keywords = []
 
-    context_file = os.path.join(cache_dir, "context.json")
+    prompt_file_name = "default.txt"
+    if os.path.exists(PROMPTS_DIR):
+        txt_files = glob.glob(os.path.join(PROMPTS_DIR, "*.txt"))
+        if txt_files:
+            prompt_file_name = os.path.basename(txt_files[0])
+    elif os.path.exists("ReadMe.txt"):
+        prompt_file_name = "ReadMe.txt"
+
+    context_file = get_assets_context_path(prompt_file_name)
     if os.path.exists(context_file):
         try:
             with open(context_file, 'r', encoding='utf-8') as f:
@@ -77,12 +86,17 @@ def build_smart_prompt(cache_dir):
     prompt_str = base_prompt
     if keywords:
         prompt_str += " 登場用語: " + "、".join(keywords)
-    
+
     return prompt_str[:220]
 
 def main():
     if len(sys.argv) < 2: sys.exit(1)
     input_file = sys.argv[1]
+
+    if not os.path.exists(input_file):
+        print(f"ERROR: Input file not found: {input_file}", flush=True)
+        sys.exit(1)
+
     cache_dir = get_cache_dir(input_file)
     audio_path = os.path.join(cache_dir, "audio_16k_norm.wav")
     output_file = os.path.join(cache_dir, "raw.srt")
@@ -91,14 +105,15 @@ def main():
         sys.exit(0)
 
     if not os.path.exists(audio_path):
+        print(f"ERROR: Audio file not found: {audio_path}", flush=True)
         sys.exit(1)
 
-    initial_prompt = build_smart_prompt(cache_dir)
+    initial_prompt = build_smart_prompt(input_file)
 
-    print("Loading Whisper Model...", flush=True)
+    print("STATUS: Loading Whisper Model", flush=True)
     model = WhisperModel(MODEL_SIZE, device="cuda", compute_type=COMPUTE_TYPE, download_root=WHISPER_DIR)
-    
-    print("Starting Transcription...", flush=True)
+
+    print("STATUS: Transcribing Audio", flush=True)
     segments, info = model.transcribe(
         audio_path,
         language="ja",

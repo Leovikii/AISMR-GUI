@@ -21,3 +21,7 @@ export function SelectFile():Promise<string>;
 export function SelectFolder():Promise<string>;
 
 export function SetSettings(arg1:main.AppConfig):Promise<void>;
+
+export function ShouldStop():Promise<boolean>;
+
+export function StopScript():Promise<void>;

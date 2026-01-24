@@ -41,3 +41,11 @@ export function SelectFolder() {
 export function SetSettings(arg1) {
   return window['go']['main']['App']['SetSettings'](arg1);
 }
+
+export function ShouldStop() {
+  return window['go']['main']['App']['ShouldStop']();
+}
+
+export function StopScript() {
+  return window['go']['main']['App']['StopScript']();
+}
