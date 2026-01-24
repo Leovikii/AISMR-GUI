@@ -5,6 +5,7 @@ Thumbs.db
 *.swp
 *.swo
 *.log
+AISMR/release/
 AISMR/build/bin/
 AISMR/wailsjs/
 AISMR/go.work
