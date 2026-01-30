@@ -10,12 +10,9 @@ from utils import QWEN_ASR_DIR, get_cache_dir, load_asmr_dict, get_assets_contex
 
 HALLUCINATION_BLACKLIST = ["Subtitle", "Caption", "Amara", "999999", "視聴ありがとう", "チャンネル登録", "高評価", "転載禁止", "字幕", "作成"]
 
-# 最小字幕长度（字符数）
-MIN_SUBTITLE_LENGTH = 3
-# 最大时间间隔（秒），用于合并相邻字幕
-MAX_TIME_GAP = 2.0
-# 最大字幕长度（字符数）
-MAX_SUBTITLE_LENGTH = 30
+# 语义断句配置
+MAX_TIME_GAP = 3.0  # 最大时间间隔（秒），超过此间隔强制断句
+MIN_SUBTITLE_LENGTH = 2  # 最小字幕长度，过滤掉过短的片段
 
 def format_timestamp(seconds):
     milliseconds = int((seconds % 1) * 1000)
@@ -59,19 +56,32 @@ def is_valid_japanese_text(text):
     ratio = japanese_chars / len(text)
     return ratio > 0.3
 
-def is_sentence_end(text):
-    """Check if text ends with sentence-ending punctuation"""
-    if not text:
-        return False
-    return text[-1] in '。！？…、'
-
-def merge_subtitle_segments(segments):
+def get_punctuation_priority(char):
     """
-    Merge small subtitle segments into larger, more readable chunks.
-    Combines segments based on:
-    - Time proximity (within MAX_TIME_GAP seconds)
-    - Text length (up to MAX_SUBTITLE_LENGTH characters)
-    - Sentence boundaries (prefer to break at punctuation)
+    获取标点符号的断句优先级
+    优先级越高，越应该在此处断句
+    """
+    if char in '。！？':  # 句号、感叹号、问号 - 最高优先级，必须断句
+        return 3
+    elif char in '…～':  # 省略号、波浪号 - 高优先级
+        return 2
+    elif char in '、，':  # 顿号、逗号 - 中等优先级
+        return 1
+    else:
+        return 0
+
+def has_strong_punctuation(text):
+    """检查文本是否包含强断句标点（。！？）"""
+    return any(p in text for p in '。！？')
+
+def semantic_merge_segments(segments):
+    """
+    基于语义的智能字幕合并
+    核心原则：
+    1. 优先在句号、感叹号、问号处断句
+    2. 如果没有强标点，在逗号、顿号处断句
+    3. 时间间隔过大时强制断句
+    4. 不使用硬性长度限制
     """
     if not segments:
         return []
@@ -86,21 +96,32 @@ def merge_subtitle_segments(segments):
     for i in range(1, len(segments)):
         seg = segments[i]
         time_gap = seg['start'] - current['end']
-        combined_text = current['text'] + seg['text']
 
-        # Decide whether to merge or start new segment
-        should_merge = (
-            time_gap <= MAX_TIME_GAP and
-            len(combined_text) <= MAX_SUBTITLE_LENGTH and
-            not is_sentence_end(current['text'])
-        )
+        # 检查当前文本的最后一个字符
+        last_char = current['text'][-1] if current['text'] else ''
+        last_char_priority = get_punctuation_priority(last_char)
 
-        if should_merge:
-            # Merge with current segment
-            current['end'] = seg['end']
-            current['text'] = combined_text
-        else:
-            # Save current and start new segment
+        # 决定是否应该断句
+        should_break = False
+
+        # 规则 1: 时间间隔过大，强制断句
+        if time_gap > MAX_TIME_GAP:
+            should_break = True
+
+        # 规则 2: 遇到强断句标点（。！？），必须断句
+        elif last_char_priority >= 3:
+            should_break = True
+
+        # 规则 3: 遇到省略号或波浪号，且时间间隔较大，断句
+        elif last_char_priority == 2 and time_gap > 1.0:
+            should_break = True
+
+        # 规则 4: 遇到逗号或顿号，且时间间隔较大，断句
+        elif last_char_priority == 1 and time_gap > 1.5:
+            should_break = True
+
+        if should_break:
+            # 保存当前片段并开始新片段
             if len(current['text']) >= MIN_SUBTITLE_LENGTH:
                 merged.append(current)
             current = {
@@ -108,17 +129,21 @@ def merge_subtitle_segments(segments):
                 'end': seg['end'],
                 'text': seg['text']
             }
+        else:
+            # 继续合并
+            current['end'] = seg['end']
+            current['text'] += seg['text']
 
-    # Don't forget the last segment
+    # 保存最后一个片段
     if len(current['text']) >= MIN_SUBTITLE_LENGTH:
         merged.append(current)
 
     return merged
 
-def split_by_sentence_punctuation(segments):
+def split_by_strong_punctuation(segments):
     """
-    Split segments at sentence-ending punctuation marks.
-    This ensures natural breaks at 。！？
+    在强标点符号（。！？）处分割字幕
+    这是最后一步处理，确保每个字幕都在语义完整的位置结束
     """
     result = []
 
@@ -128,31 +153,44 @@ def split_by_sentence_punctuation(segments):
         end_time = seg['end']
         duration = end_time - start_time
 
-        # Split by sentence-ending punctuation
+        # 如果文本中没有强标点，直接保留
+        if not has_strong_punctuation(text):
+            result.append(seg)
+            continue
+
+        # 在强标点处分割（保留标点）
         parts = re.split(r'([。！？])', text)
 
-        # Recombine punctuation with preceding text
+        # 重新组合：将标点符号附加到前面的文本
         sentences = []
-        for i in range(0, len(parts) - 1, 2):
-            if i + 1 < len(parts):
+        i = 0
+        while i < len(parts):
+            if i + 1 < len(parts) and parts[i + 1] in '。！？':
+                # 文本 + 标点
                 sentences.append(parts[i] + parts[i + 1])
-            else:
+                i += 2
+            elif parts[i]:
+                # 只有文本（最后一个片段）
                 sentences.append(parts[i])
-        if len(parts) % 2 == 1 and parts[-1]:
-            sentences.append(parts[-1])
+                i += 1
+            else:
+                i += 1
 
+        # 如果只有一个句子，不需要分割
         if len(sentences) <= 1:
             result.append(seg)
             continue
 
-        # Distribute time proportionally
+        # 按字符长度比例分配时间
         total_len = sum(len(s) for s in sentences)
         current_time = start_time
 
         for sentence in sentences:
-            if not sentence.strip():
+            sentence = sentence.strip()
+            if not sentence:
                 continue
 
+            # 计算这个句子的时间占比
             sentence_ratio = len(sentence) / total_len if total_len > 0 else 1.0 / len(sentences)
             sentence_duration = duration * sentence_ratio
             sentence_end = current_time + sentence_duration
@@ -304,14 +342,14 @@ def main():
 
     print(f"STATUS: Collected {len(raw_segments)} raw segments", flush=True)
 
-    # Merge small segments into readable chunks
-    print("STATUS: Merging subtitle segments", flush=True)
-    merged_segments = merge_subtitle_segments(raw_segments)
+    # Semantic merge based on punctuation
+    print("STATUS: Semantic merging based on punctuation", flush=True)
+    merged_segments = semantic_merge_segments(raw_segments)
     print(f"STATUS: Merged into {len(merged_segments)} segments", flush=True)
 
-    # Split at sentence boundaries
-    print("STATUS: Splitting at sentence boundaries", flush=True)
-    final_segments = split_by_sentence_punctuation(merged_segments)
+    # Split at strong punctuation marks (。！？)
+    print("STATUS: Splitting at strong punctuation marks", flush=True)
+    final_segments = split_by_strong_punctuation(merged_segments)
     print(f"STATUS: Final output: {len(final_segments)} segments", flush=True)
 
     # Write output
